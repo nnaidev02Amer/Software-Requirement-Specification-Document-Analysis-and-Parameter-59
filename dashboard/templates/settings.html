@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block subheading %}Display preferences and system information{% endblock %}
+{% block content %}
+<section class="grid g-2">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="user-round"></i>Profile &amp; preferences</h2><p>Saved in this browser only – the app has no user accounts.</p></div></div>
+    <div class="setting">
+      <div><b>Display name</b><small>Shown in the sidebar, header and welcome message</small></div>
+      <input class="input" id="s-name" maxlength="40" style="width:220px">
+    </div>
+    <div class="setting">
+      <div><b>Collapse sidebar by default</b><small>Icon-only navigation on desktop</small></div>
+      <label class="toggle"><input type="checkbox" id="s-collapse"><span></span></label>
+    </div>
+    <div class="setting">
+      <div><b>Hide fragments in reports</b><small>Headings / numbering of ≤ 3 words</small></div>
+      <label class="toggle"><input type="checkbox" id="s-frag"><span></span></label>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn primary" id="s-save"><i data-lucide="save"></i>Save preferences</button>
+      <span id="s-ok" class="badge ok" hidden><i data-lucide="circle-check"></i>Saved</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="cpu"></i>System information</h2><p>Read from the running server</p></div></div>
+    <dl class="kv">
+      {% for k, v in info.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+    </dl>
+    <div class="note" style="margin-top:16px"><i data-lucide="shield-check"></i>
+      <span>Everything runs locally: no external APIs, no paid services, no data leaves this computer.
+        Host and port can be changed with the <code>SRS_HOST</code> / <code>SRS_PORT</code> environment variables.</span></div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  const n = document.getElementById('s-name'), c = document.getElementById('s-collapse'), f = document.getElementById('s-frag');
+  n.value = localStorage.getItem('srs.username') || 'Project User';
+  c.checked = localStorage.getItem('srs.sidebar') === 'collapsed';
+  f.checked = localStorage.getItem('srs.hideFragments') !== 'false';
+  document.getElementById('s-save').addEventListener('click', () => {
+    localStorage.setItem('srs.username', n.value.trim() || 'Project User');
+    localStorage.setItem('srs.sidebar', c.checked ? 'collapsed' : 'open');
+    localStorage.setItem('srs.hideFragments', f.checked ? 'true' : 'false');
+    document.body.classList.toggle('sb-collapsed', c.checked);
+    const name = localStorage.getItem('srs.username');
+    document.querySelectorAll('[data-username]').forEach(el => el.textContent = name);
+    document.querySelectorAll('[data-initials]').forEach(el =>
+      el.textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join(''));
+    const ok = document.getElementById('s-ok'); ok.hidden = false; setTimeout(() => ok.hidden = true, 1800);
+  });
+</script>
+{% endblock %}

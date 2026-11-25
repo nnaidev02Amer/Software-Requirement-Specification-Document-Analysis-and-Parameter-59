@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="empty" style="padding:60px 10px">
+    <i data-lucide="{{ icon }}"></i>
+    <h2 style="color:var(--ink);margin:6px 0">{{ message }}</h2>
+    <p>Upload an SRS PDF to generate an analysis.</p>
+    <div class="actions" style="justify-content:center;margin-top:12px">
+      <a class="btn primary" href="{{ url_for('upload') }}"><i data-lucide="cloud-upload"></i>Upload SRS document</a>
+      <a class="btn" href="{{ url_for('index') }}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

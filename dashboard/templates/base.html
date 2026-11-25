@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dashboard{% endblock %} · SRS Intelligence</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script>
+    // apply saved sidebar state before paint (no flicker)
+    if (localStorage.getItem('srs.sidebar') === 'collapsed') document.documentElement.classList.add('pre-c');
+  </script>
+</head>
+<body>
+<script>if (document.documentElement.classList.contains('pre-c')) document.body.classList.add('sb-collapsed');</script>
+
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+  <div class="sb-head">
+    <div class="sb-logo"><i data-lucide="scan-text"></i></div>
+    <div class="sb-name"><b>SRS Intelligence</b><span>Requirement analysis · ML</span></div>
+    <button class="sb-toggle" id="sb-toggle" title="Collapse / expand sidebar" aria-label="Toggle sidebar">
+      <i data-lucide="panel-left-close" class="when-o"></i><i data-lucide="panel-left-open" class="when-c"></i>
+    </button>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Workspace</div>
+    {% for key, label, icon, endpoint in nav %}
+      {% if key == 'analytics' %}<div class="sb-section">Insights</div>{% endif %}
+      {% if key == 'settings' %}<div class="sb-section">System</div>{% endif %}
+      <a href="{{ url_for(endpoint) }}" class="sb-link {{ 'active' if active == key }}" title="{{ label }}"
+         {% if active == key %}aria-current="page"{% endif %}>
+        <i data-lucide="{{ icon }}"></i><span class="lbl">{{ label }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+  <div class="sb-foot">
+    <a class="sb-user" href="{{ url_for('settings') }}" title="Profile & settings">
+      <div class="avatar" data-initials>PU</div>
+      <div class="who"><b data-username>Project User</b><span>Local workspace</span></div>
+    </a>
+  </div>
+</aside>
+<div class="overlay" id="overlay"></div>
+
+<div class="shell">
+  <header class="topbar">
+    <button class="icon-btn tb-menu" id="tb-menu" aria-label="Open menu"><i data-lucide="menu"></i></button>
+    <div class="tb-title">
+      <h1>{% block heading %}Dashboard{% endblock %}</h1>
+      <p>{% block subheading %}SRS document analysis &amp; parameter identification{% endblock %}</p>
+    </div>
+    <form class="tb-search" action="{{ url_for('documents') }}" method="get" role="search">
+      <i data-lucide="search"></i>
+      <input type="search" name="q" placeholder="Search documents…" value="{{ q if q is defined else '' }}" aria-label="Search documents">
+    </form>
+    <div class="dropdown" id="notif">
+      <button class="icon-btn" aria-label="Notifications" aria-haspopup="true">
+        <i data-lucide="bell"></i>{% if notifications %}<span class="dot"></span>{% endif %}
+      </button>
+      <div class="menu" role="menu">
+        <h4>Recent analyses</h4>
+        {% for n in notifications %}
+          <a href="{{ url_for('report', rid=n.id) }}"><span class="mi"><i data-lucide="circle-check"></i></span>
+            <span><b>{{ n.file_name }}</b><small>{{ n.requirement_sentences }} requirement sentences · {{ n.created }}</small></span></a>
+        {% else %}
+          <div class="empty small">No analyses yet</div>
+        {% endfor %}
+      </div>
+    </div>
+    <a class="tb-user" href="{{ url_for('settings') }}">
+      <div class="avatar" data-initials>PU</div>
+      <div class="who"><b data-username>Project User</b><span>Analyst</span></div>
+    </a>
+  </header>
+
+  <main class="content fade-in">
+    {% with messages = get_flashed_messages() %}
+      {% for m in messages %}<div class="flash"><i data-lucide="circle-alert"></i>{{ m }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="foot">
+    Model: {% for name, cls in model_info.steps %}{{ cls }}{% if not loop.last %} → {% endif %}{% endfor %}
+    · {{ model_info.vocabulary_size }}-term vocabulary · {{ model_info.labels|length }} parameters
+    · saved with scikit-learn {{ model_info.sklearn_version_saved }} · runs fully offline
+  </footer>
+</div>
+<div id="tip" class="tip" hidden></div>
+
+<script src="{{ url_for('static', filename='vendor/lucide.min.js') }}"></script>
+<script>
+  lucide.createIcons();
+  const body = document.body;
+  // sidebar collapse (desktop) / off-canvas (mobile)
+  document.getElementById('sb-toggle').addEventListener('click', () => {
+    body.classList.toggle('sb-collapsed');
+    localStorage.setItem('srs.sidebar', body.classList.contains('sb-collapsed') ? 'collapsed' : 'open');
+  });
+  document.getElementById('tb-menu').addEventListener('click', () => body.classList.add('sb-open'));
+  document.getElementById('overlay').addEventListener('click', () => body.classList.remove('sb-open'));
+  // notifications dropdown
+  const notif = document.getElementById('notif');
+  notif.querySelector('button').addEventListener('click', e => { e.stopPropagation(); notif.classList.toggle('open'); });
+  document.addEventListener('click', e => { if (!notif.contains(e.target)) notif.classList.remove('open'); });
+  // profile name (stored only in this browser; there is no login in this app)
+  const uname = localStorage.getItem('srs.username') || 'Project User';
+  document.querySelectorAll('[data-username]').forEach(el => el.textContent = uname);
+  document.querySelectorAll('[data-initials]').forEach(el =>
+    el.textContent = uname.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'U');
+  // shared tooltip for chart marks
+  const tip = document.getElementById('tip');
+  document.addEventListener('mouseover', e => {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tip.hidden = true; return; }
+    tip.textContent = t.dataset.tip; tip.hidden = false;
+  });
+  document.addEventListener('mousemove', e => { tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; });
+
+  // PDF upload with real upload progress (XHR), shared by Dashboard and Upload pages
+  document.querySelectorAll('form[data-upload]').forEach(form => {
+    const input = form.querySelector('input[type=file]'), drop = form.querySelector('.drop');
+    const pill = form.querySelector('.file-pill'), go = form.querySelector('[data-go]');
+    const prog = form.querySelector('.progress'), fill = prog.querySelector('.fill'), pct = prog.querySelector('[data-pct]'),
+          label = prog.querySelector('[data-label]'), steps = prog.querySelectorAll('.steps div');
+    const setStep = n => steps.forEach((s, i) => s.classList.toggle('on', i <= n));
+    const show = () => {
+      if (!input.files.length) return;
+      const f = input.files[0];
+      pill.querySelector('b').textContent = f.name;
+      pill.querySelector('small').textContent = (f.size / 1024).toFixed(1) + ' KB · PDF';
+      pill.classList.add('show'); go.disabled = false;
+    };
+    input.addEventListener('change', show);
+    ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('over')));
+    drop.addEventListener('drop', e => { e.preventDefault(); input.files = e.dataTransfer.files; show(); });
+    form.querySelectorAll('[data-browse]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); input.click(); }));
+    form.addEventListener('submit', e => {
+      const sample = e.submitter && e.submitter.name === 'use_sample';
+      if (!sample && !input.files.length) { e.preventDefault(); input.click(); return; }
+      e.preventDefault();
+      const data = new FormData(form);
+      if (sample) { data.delete('document'); data.append('use_sample', '1'); }
+      form.querySelectorAll('button').forEach(b => b.disabled = true);
+      prog.classList.add('show'); setStep(0);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action);
+      xhr.upload.onprogress = ev => {
+        if (!ev.lengthComputable) return;
+        const p = Math.round(ev.loaded / ev.total * 100);
+        fill.style.width = p + '%'; pct.textContent = p + '%';
+      };
+      xhr.upload.onload = () => {
+        fill.style.width = '100%'; pct.textContent = '100%';
+        prog.classList.add('busy'); label.textContent = 'Uploaded · analysing on server…'; pct.textContent = '';
+        setStep(3);
+      };
+      xhr.onload = () => { window.location = xhr.responseURL || '{{ url_for("documents") }}'; };
+      xhr.onerror = () => { label.textContent = 'Upload failed – is the server running?'; prog.classList.remove('busy');
+        form.querySelectorAll('button').forEach(b => b.disabled = false); };
+      xhr.send(data);
+    });
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

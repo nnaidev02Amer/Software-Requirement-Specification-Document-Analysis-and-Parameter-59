@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hbars %}
+{% block title %}SRS Analysis – {{ r.file_name }}{% endblock %}
+{% block heading %}SRS Analysis{% endblock %}
+{% block subheading %}{{ r.file_name }} · analysed {{ r.created }}{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom:20px">
+  <div class="card-h" style="margin-bottom:0">
+    <div class="doc-cell"><span class="doc-ic"><i data-lucide="file-text"></i></span>
+      <span><b>{{ r.file_name }}</b><small>Report {{ r.id }} · {{ r.created }}</small></span></div>
+    <div class="actions no-print">
+      {% if docs|length > 1 %}
+      <select class="select" onchange="location = this.value" aria-label="Switch document">
+        {% for d in docs %}<option value="{{ url_for('report', rid=d.id) }}" {{ 'selected' if d.id == r.id }}>{{ d.file_name }} · {{ d.created }}</option>{% endfor %}
+      </select>{% endif %}
+      <a class="btn sm" href="{{ url_for('report_csv', rid=r.id) }}"><i data-lucide="file-spreadsheet"></i>Download CSV</a>
+      <a class="btn sm" href="{{ url_for('report_json', rid=r.id) }}"><i data-lucide="file-json"></i>Download JSON</a>
+      <button class="btn sm primary" onclick="window.print()"><i data-lucide="printer"></i>Print / Save PDF</button>
+    </div>
+  </div>
+</section>
+
+<section class="grid g-4">
+  <div class="card stat"><div class="ic"><i data-lucide="book-open"></i></div><div><div class="k">PDF pages</div><div class="v">{{ r.pages }}</div><div class="s">{{ r.characters }} characters</div></div></div>
+  <div class="card stat"><div class="ic alt"><i data-lucide="text-quote"></i></div><div><div class="k">Sentences extracted</div><div class="v">{{ r.total_sentences }}</div><div class="s">{{ r.fragments }} heading/numbering fragments</div></div></div>
+  <div class="card stat"><div class="ic alt2"><i data-lucide="list-checks"></i></div><div><div class="k">Requirement sentences</div><div class="v">{{ r.requirement_sentences }}</div><div class="s">more than 3 words</div></div></div>
+  <div class="card stat"><div class="ic alt3"><i data-lucide="tags"></i></div><div><div class="k">Parameters identified</div><div class="v">{{ r.parameters_found }} / {{ r.label_counts|length }}</div><div class="s">at least one sentence</div></div></div>
+</section>
+
+<section class="grid g-2">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="chart-column"></i>Requirement sentences per parameter</h2><p>Predicted labels, fragments excluded</p></div></div>
+    {{ hbars(r.label_counts) }}
+    {% set missing = [] %}{% for label, c in r.label_counts.items() if c == 0 %}{% set _ = missing.append(label) %}{% endfor %}
+    {% if missing %}<p class="small faint" style="margin-top:14px">Not detected: {{ missing|join(', ') }}</p>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="tags"></i>Identified parameters</h2><p>Sentences grouped by predicted parameter</p></div>
+      <a class="btn sm no-print" href="{{ url_for('parameters', doc=r.id) }}">Parameter view <i data-lucide="arrow-right"></i></a></div>
+    {% for label, items in r.by_label.items() %}
+      <details class="param" {% if loop.first %}open{% endif %}>
+        <summary><span class="sw" style="background: {{ param_color[label] }}"></span>{{ label }}
+          <span class="chip" style="padding:1px 8px">{{ items|length }}</span><i data-lucide="chevron-down" class="chev"></i></summary>
+        <ul class="sent-list">{% for p in items %}<li><span>{{ p.sentence.split()|join(' ') }}</span><span class="score" title="SVM decision score">{{ '%.3f'|format(p.decision_score) }}</span></li>{% endfor %}</ul>
+      </details>
+    {% else %}<div class="empty"><i data-lucide="file-x"></i><div>No requirement sentences found.</div></div>{% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-h">
+    <div><h2><i data-lucide="table-2"></i>Extracted sentences and predicted parameters</h2><p>Showing <span id="shown"></span> of {{ r.total_sentences }} sentences</p></div>
+    <div class="filters no-print">
+      <input id="q" class="input" type="search" placeholder="Search sentences…">
+      <select id="lf" class="select"><option value="">All parameters</option>
+        {% for label in r.label_counts %}<option>{{ label }}</option>{% endfor %}</select>
+      <label class="check"><input type="checkbox" id="hf" checked> Hide fragments (≤ 3 words)</label>
+    </div>
+  </div>
+  <div class="table-wrap">
+  <table class="table" id="results">
+    <thead><tr><th class="num">#</th><th>Sentence</th><th>Predicted parameter</th>
+      <th class="num" title="LinearSVC decision_function value for the predicted class. Not a probability.">SVM score</th></tr></thead>
+    <tbody>
+    {% for p in r.predictions %}
+      <tr data-label="{{ p.label }}" data-frag="{{ 1 if p.is_fragment else 0 }}" class="{{ 'frag' if p.is_fragment }}">
+        <td class="num faint">{{ p.index }}</td>
+        <td>{{ p.sentence.split()|join(' ') }}</td>
+        <td><span class="chip"><span class="sw" style="background: {{ param_color[p.label] }}"></span>{{ p.label }}</span></td>
+        <td class="num">{{ '%.3f'|format(p.decision_score) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="note" style="margin-top:16px"><i data-lucide="info"></i>
+    <span><b>SVM score</b> is the raw LinearSVC margin for the predicted class (higher = further from the decision boundary).
+    The original project does not compute probabilities, so no confidence percentage is shown. Fragments are headings or
+    numbering produced by the original sentence splitter; the model still assigns them a label.</span></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  const q = document.getElementById('q'), lf = document.getElementById('lf'), hf = document.getElementById('hf');
+  if (localStorage.getItem('srs.hideFragments') === 'false') hf.checked = false;
+  function apply() {
+    const text = q.value.toLowerCase(); let n = 0;
+    document.querySelectorAll('#results tbody tr').forEach(tr => {
+      const ok = (!lf.value || tr.dataset.label === lf.value) && (!hf.checked || tr.dataset.frag === '0')
+        && (!text || tr.textContent.toLowerCase().includes(text));
+      tr.hidden = !ok; if (ok) n++;
+    });
+    document.getElementById('shown').textContent = n;
+  }
+  [q, lf, hf].forEach(el => el.addEventListener('input', apply)); apply();
+</script>
+{% endblock %}

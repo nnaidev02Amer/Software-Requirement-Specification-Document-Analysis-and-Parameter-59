@@ -1,0 +1,12 @@
+# OPTIONAL and UNVERIFIED: dependencies inferred from srs-chatbot/app.py imports.
+# The repository ships no requirements file for the chatbot; versions are not pinned
+# because the originals are unknown. Pulls in PyTorch (large download, high RAM use).
+flask
+flask-session
+pillow
+pypdf
+langchain-community
+langchain-huggingface
+langchain-google-genai
+sentence-transformers
+faiss-cpu

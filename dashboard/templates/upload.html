@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import upload_card %}
+{% block title %}Upload SRS Document{% endblock %}
+{% block heading %}Upload SRS Document{% endblock %}
+{% block subheading %}Analyse a PDF with the trained classifier{% endblock %}
+{% block content %}
+<section class="grid g-21">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="cloud-upload"></i>Upload a requirements document</h2>
+      <p>The upload bar shows real transfer progress; analysis then runs on the server (usually under a second).</p></div></div>
+    {{ upload_card() }}
+    <div class="note" style="margin-top:18px"><i data-lucide="info"></i>
+      <span>Only text-based PDFs are supported (PyMuPDF extraction, no OCR). Each sentence is assigned to exactly one of the
+        {{ model_info.labels|length }} parameters; the model has no "other" class.</span></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="workflow"></i>What happens</h2></div></div>
+    <ol class="flow">
+      <li><b>Extract</b><span>Text from every page with PyMuPDF</span></li>
+      <li><b>Split</b><span>Sentence regex from the original notebook</span></li>
+      <li><b>Vectorise</b><span>TF-IDF ({{ model_info.vocabulary_size }}-term vocabulary)</span></li>
+      <li><b>Classify</b><span>Linear SVM → LabelEncoder → parameter name</span></li>
+      <li><b>Report</b><span>Parameters, sentence table, CSV / JSON export</span></li>
+    </ol>
+    <h3 class="small faint" style="text-transform:uppercase;letter-spacing:.08em;margin:14px 0 8px">Identifiable parameters</h3>
+    <div class="actions" style="gap:6px">
+      {% for l in model_info.labels %}<span class="chip"><span class="sw" style="background: {{ param_color[l] }}"></span>{{ l }}</span>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-h"><div><h2><i data-lucide="history"></i>Recently analysed</h2></div>
+    <a class="btn sm" href="{{ url_for('documents') }}">My documents <i data-lucide="arrow-right"></i></a></div>
+  <ul class="activity">
+    {% for d in recent %}
+    <li><span class="ai"><i data-lucide="file-check"></i></span>
+      <div><b><a href="{{ url_for('report', rid=d.id) }}">{{ d.file_name }}</a></b>
+        <small>{{ d.created }} · {{ d.total_sentences }} sentences · {{ d.parameters_found }} parameters</small></div></li>
+    {% else %}<li class="empty">Nothing analysed yet</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

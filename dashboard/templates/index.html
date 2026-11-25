@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "_macros.html" import upload_card, hbars, donut, confusion, doc_table %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
+<section class="hero">
+  <h2>Welcome back, <span data-username>Project User</span></h2>
+  <p>Upload a Software Requirement Specification and the TF-IDF + Linear SVM model will extract every sentence
+     and identify which of the {{ model_info.labels|length }} requirement parameters it describes.</p>
+  <div class="actions">
+    <a class="btn glass" href="{{ url_for('upload') }}"><i data-lucide="cloud-upload"></i>Upload SRS document</a>
+    <a class="btn glass" href="{{ url_for('analysis') }}"><i data-lucide="file-search"></i>Open latest analysis</a>
+  </div>
+  <div class="hero-art"><i data-lucide="scan-text"></i></div>
+</section>
+
+<section class="grid g-4">
+  <div class="card lift stat"><div class="ic"><i data-lucide="files"></i></div>
+    <div><div class="k">Documents Analysed</div><div class="v">{{ agg.documents }}</div><div class="s">{{ agg.pages }} PDF pages processed</div></div></div>
+  <div class="card lift stat"><div class="ic alt"><i data-lucide="text-quote"></i></div>
+    <div><div class="k">Sentences Extracted</div><div class="v">{{ agg.sentences }}</div><div class="s">{{ agg.requirements }} requirement sentences</div></div></div>
+  <div class="card lift stat"><div class="ic alt2"><i data-lucide="tags"></i></div>
+    <div><div class="k">Parameters Identified</div><div class="v">{{ agg.params_identified }} / {{ agg.n_labels }}</div><div class="s">across all analysed documents</div></div></div>
+  <div class="card lift stat"><div class="ic alt3"><i data-lucide="target"></i></div>
+    <div><div class="k">Model Accuracy</div><div class="v">{{ '%.2f'|format(ev.accuracy * 100) }}%</div><div class="s">saved model · {{ ev.n_test }} test sentences</div></div></div>
+</section>
+
+<section class="grid g-12">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="cloud-upload"></i>Analyse a new document</h2><p>PDF → text → sentences → parameters</p></div></div>
+    {{ upload_card(compact=True) }}
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="chart-column"></i>Sentences classified by parameter</h2>
+      <p>All analysed documents · headings/numbering fragments excluded</p></div>
+      <a class="btn sm" href="{{ url_for('analytics') }}">Analytics <i data-lucide="arrow-right"></i></a></div>
+    {% if agg.requirements %}{{ hbars(agg.label_totals) }}
+    {% else %}<div class="empty"><i data-lucide="chart-column"></i><div>Analyse a document to see results</div></div>{% endif %}
+  </div>
+</section>
+
+<section class="grid g-21">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="chart-pie"></i>Parameter distribution</h2><p>Share of requirement sentences per parameter</p></div></div>
+    {{ donut(agg) }}
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="activity"></i>Recent analysis activity</h2></div></div>
+    <ul class="activity">
+      {% for d in recent[:5] %}
+      <li><span class="ai"><i data-lucide="file-check"></i></span>
+        <div style="min-width:0"><b><a href="{{ url_for('report', rid=d.id) }}">{{ d.file_name }}</a></b>
+          <small>{{ d.total_sentences }} sentences · {{ d.parameters_found }} parameters · {{ d.created }}</small></div></li>
+      {% else %}<li class="empty">No activity yet</li>{% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="card" style="margin-bottom:20px">
+  <div class="card-h"><div><h2><i data-lucide="folder-open"></i>Recent documents</h2></div>
+    <a class="btn sm" href="{{ url_for('documents') }}">All documents <i data-lucide="arrow-right"></i></a></div>
+  {{ doc_table(recent, show_exports=False) }}
+</section>
+
+<section class="card">
+  <div class="card-h"><div><h2><i data-lucide="brain-circuit"></i>ML model overview</h2><p>Saved pipeline, evaluated live on the notebook's held-out split (not retrained)</p></div>
+    <a class="btn sm" href="{{ url_for('model') }}">Full performance <i data-lucide="arrow-right"></i></a></div>
+  <div class="grid g-3" style="margin-bottom:0; align-items:center">
+    <div style="display:flex; gap:20px; align-items:center">
+      <div class="gauge" style="--v: {{ ev.accuracy * 100 }}"><div><div><b>{{ '%.2f'|format(ev.accuracy * 100) }}%</b><span>test accuracy</span></div></div></div>
+      <dl class="kv small">
+        <dt>Correct</dt><dd>{{ ev.correct }} / {{ ev.n_test }}</dd>
+        <dt>Macro F1</dt><dd>{{ '%.2f'|format(ev.macro_f1) }}</dd>
+        <dt>Training</dt><dd>{{ ev.n_train }} sentences</dd>
+      </dl>
+    </div>
+    <div class="pipeline vertical">
+      <div class="pipe"><div class="ic"><i data-lucide="text-search"></i></div><div><b>TF-IDF Vectorizer</b><span>{{ model_info.vocabulary_size }}-term vocabulary</span></div></div>
+      <i data-lucide="arrow-right"></i>
+      <div class="pipe"><div class="ic"><i data-lucide="split"></i></div><div><b>Linear SVM classifier</b><span>LinearSVC · one-vs-rest</span></div></div>
+      <i data-lucide="arrow-right"></i>
+      <div class="pipe"><div class="ic"><i data-lucide="tags"></i></div><div><b>Label Encoder</b><span>{{ model_info.labels|length }} parameters</span></div></div>
+    </div>
+    <div style="justify-self:center"><div class="faint small" style="margin-bottom:6px">Confusion matrix (true × predicted)</div>{{ confusion(ev, mini=True) }}</div>
+  </div>
+</section>
+{% endblock %}

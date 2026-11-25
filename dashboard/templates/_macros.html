@@ -1,0 +1,115 @@
+{# Reusable UI pieces. All values come from the caller (real backend data). #}
+
+{% macro upload_card(compact=False) %}
+<form data-upload class="{{ 'upload-compact' if compact }}" action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data">
+  <label class="drop" for="doc-{{ 'c' if compact else 'f' }}">
+    <input type="file" name="document" id="doc-{{ 'c' if compact else 'f' }}" accept="application/pdf,.pdf">
+    <span class="big"><i data-lucide="cloud-upload"></i></span>
+    <b>Drag &amp; drop your SRS PDF here</b>
+    <span class="muted small">Text-based PDF · up to 10 MB</span>
+    <span class="btn sm" data-browse><i data-lucide="folder-open"></i>Browse files</span>
+  </label>
+  <div class="file-pill">
+    <span class="doc-ic"><i data-lucide="file-text"></i></span>
+    <span style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></b><small class="faint"></small></span>
+  </div>
+  <div class="progress">
+    <div class="row"><span data-label>Uploading…</span><span data-pct>0%</span></div>
+    <div class="track"><div class="fill"></div></div>
+    <div class="steps">
+      <div><i data-lucide="cloud-upload"></i>Upload</div><div><i data-lucide="file-text"></i>Extract text</div>
+      <div><i data-lucide="scissors"></i>Split sentences</div><div><i data-lucide="brain-circuit"></i>Classify</div>
+    </div>
+  </div>
+  <div class="actions" style="margin-top:16px">
+    <button type="submit" class="btn primary" data-go disabled><i data-lucide="sparkles"></i>Analyse Document</button>
+    <button type="submit" name="use_sample" value="1" class="btn"><i data-lucide="file-check"></i>Try bundled SRS.pdf</button>
+  </div>
+</form>
+{% endmacro %}
+
+{% macro hbars(counts, unit='sentence') %}
+{% set mx = (counts.values()|max) if counts else 0 %}
+<div class="hbars">
+  {% for label, c in counts.items() %}
+  <div class="hrow">
+    <span class="hl" title="{{ label }}"><span>{{ label }}</span></span>
+    <span class="htrack"><span class="hbar" style="width: {{ ((c / mx * 100) if mx else 0)|round(1) }}%"
+          data-tip="{{ label }}: {{ c }} {{ unit }}{{ '' if c == 1 else 's' }}"></span></span>
+    <span class="hv">{{ c }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro donut(agg, caption='requirement sentences') %}
+{% if agg.requirements %}
+<div class="donut-wrap">
+  <div class="donut">
+    <svg viewBox="0 0 42 42" role="img" aria-label="Parameter distribution">
+      <circle cx="21" cy="21" r="15.915" stroke="#eef0f6"></circle>
+      {% for s in agg.donut %}
+      <circle class="seg" cx="21" cy="21" r="15.915" stroke="{{ s.color }}" stroke-dasharray="{{ s.dash }}"
+              stroke-dashoffset="{{ s.offset }}" data-tip="{{ s.label }}: {{ s.count }} ({{ '%.1f'|format(s.pct) }}%)"></circle>
+      {% endfor %}
+    </svg>
+    <div class="center"><div><b>{{ agg.requirements }}</b><span>{{ caption }}</span></div></div>
+  </div>
+  <ul class="legend">
+    {% for s in agg.donut %}
+    <li><span class="sw" style="background: {{ s.color }}"></span><span>{{ s.label }}</span>
+      <span class="c">{{ s.count }}</span><span class="p">{{ '%.1f'|format(s.pct) }}%</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="empty"><i data-lucide="chart-pie"></i><div>No analysed documents yet</div></div>
+{% endif %}
+{% endmacro %}
+
+{% macro confusion(ev, mini=False) %}
+{% set ramp = ['#ffffff', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95'] %}
+<div class="table-wrap">
+<table class="cm {{ 'mini' if mini }}">
+  {% if not mini %}<tr><th></th>{% for l in ev.labels %}<th class="rot"><span>{{ l }}</span></th>{% endfor %}</tr>{% endif %}
+  {% for row in ev.cm %}{% set i = loop.index0 %}
+  <tr>{% if not mini %}<th class="rl">{{ ev.labels[i] }}</th>{% endif %}
+    {% for v in row %}{% set step = ((v / ev.cm_max) * 6)|round|int %}
+    <td style="background: {{ ramp[step] }}; color: {{ '#fff' if step >= 4 else '#0f172a' }}; {{ 'outline: 1px solid #eef0f6;' if v == 0 }}"
+        data-tip="True {{ ev.labels[i] }} → predicted {{ ev.labels[loop.index0] }}: {{ v }}">{{ v if v else '' }}</td>
+    {% endfor %}</tr>
+  {% endfor %}
+</table>
+</div>
+{% endmacro %}
+
+{% macro doc_table(docs, show_exports=True) %}
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th>Document</th><th>Uploaded</th><th class="num">Pages</th><th class="num">Sentences</th>
+    <th class="num">Parameters</th><th>Status</th><th class="num">Actions</th></tr></thead>
+  <tbody>
+  {% for d in docs %}
+    <tr>
+      <td><div class="doc-cell"><span class="doc-ic"><i data-lucide="file-text"></i></span>
+        <span><b>{{ d.file_name }}</b><small>{{ d.requirement_sentences }} requirement sentences</small></span></div></td>
+      <td class="muted">{{ d.created }}</td>
+      <td class="num">{{ d.pages }}</td>
+      <td class="num">{{ d.total_sentences }}</td>
+      <td class="num">{{ d.parameters_found }} / {{ d.label_counts|length }}</td>
+      <td>{% if d.status == 'Completed' %}<span class="badge ok"><i data-lucide="circle-check"></i>Completed</span>
+          {% else %}<span class="badge warn"><i data-lucide="circle-alert"></i>{{ d.status }}</span>{% endif %}</td>
+      <td class="num"><div class="actions" style="justify-content:flex-end">
+        <a class="btn sm primary" href="{{ url_for('report', rid=d.id) }}"><i data-lucide="eye"></i>View results</a>
+        {% if show_exports %}
+        <a class="btn sm" href="{{ url_for('report_csv', rid=d.id) }}" title="Download CSV"><i data-lucide="file-spreadsheet"></i>CSV</a>
+        <a class="btn sm" href="{{ url_for('report_json', rid=d.id) }}" title="Download JSON"><i data-lucide="file-json"></i>JSON</a>
+        {% endif %}</div></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if not docs %}<div class="empty"><i data-lucide="folder-open"></i><div>No documents analysed yet.</div>
+  <a class="btn primary" style="margin-top:10px" href="{{ url_for('upload') }}"><i data-lucide="cloud-upload"></i>Upload SRS document</a></div>{% endif %}
+{% endmacro %}

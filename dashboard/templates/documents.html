@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import doc_table %}
+{% block title %}My Documents{% endblock %}
+{% block heading %}My Documents{% endblock %}
+{% block subheading %}Every SRS document analysed in this workspace{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-h">
+    <div><h2><i data-lucide="folder-open"></i>{{ docs|length }} document{{ '' if docs|length == 1 else 's' }}{% if q %} matching “{{ q }}”{% endif %}</h2></div>
+    <div class="actions">
+      <form class="filters" method="get">
+        <input class="input" type="search" name="q" value="{{ q }}" placeholder="Filter by file name">
+        <button class="btn sm"><i data-lucide="filter"></i>Filter</button>
+        {% if q %}<a class="btn sm" href="{{ url_for('documents') }}"><i data-lucide="x"></i>Clear</a>{% endif %}
+      </form>
+      <a class="btn sm" href="{{ url_for('summary_csv') }}"><i data-lucide="download"></i>Summary CSV</a>
+      <a class="btn sm primary" href="{{ url_for('upload') }}"><i data-lucide="cloud-upload"></i>Upload</a>
+    </div>
+  </div>
+  {{ doc_table(docs) }}
+</section>
+{% endblock %}

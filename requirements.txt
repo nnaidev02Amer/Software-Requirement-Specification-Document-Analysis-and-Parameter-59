@@ -1,0 +1,14 @@
+# Core ML + dashboard (verified on Python 3.9.4, Windows 11).
+# scikit-learn is pinned to 1.5.2 because sentence_classifier_pipeline.pkl
+# and label_encoder.pkl were saved with that exact version.
+scikit-learn==1.5.2
+numpy==1.26.4
+scipy==1.13.1
+joblib>=1.4
+pandas==2.2.3
+PyMuPDF==1.24.13
+Flask==3.1.*
+
+# Optional: the original Gemini RAG chatbot in srs-chatbot/ needs a different,
+# much heavier stack (~1.5-2 GB incl. PyTorch) and a Google API key.
+# See requirements-chatbot.txt. Not installed in the verified setup.

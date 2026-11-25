@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hbars, confusion %}
+{% block title %}ML Model Performance{% endblock %}
+{% block heading %}ML Model Performance{% endblock %}
+{% block subheading %}Saved TF-IDF + Linear SVM pipeline, evaluated live (not retrained){% endblock %}
+{% block content %}
+<section class="grid g-4">
+  <div class="card stat"><div class="ic alt3"><i data-lucide="target"></i></div><div><div class="k">Test accuracy</div><div class="v">{{ '%.2f'|format(ev.accuracy * 100) }}%</div><div class="s">{{ ev.correct }} of {{ ev.n_test }} correct</div></div></div>
+  <div class="card stat"><div class="ic"><i data-lucide="gauge"></i></div><div><div class="k">Macro F1</div><div class="v">{{ '%.2f'|format(ev.macro_f1) }}</div><div class="s">unweighted mean of 8 classes</div></div></div>
+  <div class="card stat"><div class="ic alt"><i data-lucide="database"></i></div><div><div class="k">Labelled sentences</div><div class="v">{{ ev.n_rows }}</div><div class="s">{{ ev.n_train }} train · {{ ev.n_test }} test (80/20)</div></div></div>
+  <div class="card stat"><div class="ic alt2"><i data-lucide="tags"></i></div><div><div class="k">Parameter classes</div><div class="v">{{ ev.labels|length }}</div><div class="s">LabelEncoder classes</div></div></div>
+</section>
+
+<section class="card" style="margin-bottom:20px">
+  <div class="card-h"><div><h2><i data-lucide="workflow"></i>Model pipeline</h2><p>sentence_classifier_pipeline.pkl + label_encoder.pkl, saved with scikit-learn {{ model_info.sklearn_version_saved }}</p></div></div>
+  <div class="pipeline">
+    <div class="pipe"><div class="ic"><i data-lucide="file-text"></i></div><b>PDF text</b><span>PyMuPDF · regex sentence split</span></div>
+    <i data-lucide="arrow-right"></i>
+    <div class="pipe"><div class="ic"><i data-lucide="text-search"></i></div><b>TfidfVectorizer</b><span>default settings · {{ model_info.vocabulary_size }} terms</span></div>
+    <i data-lucide="arrow-right"></i>
+    <div class="pipe"><div class="ic"><i data-lucide="split"></i></div><b>LinearSVC</b><span>linear SVM · one-vs-rest · C = 1.0</span></div>
+    <i data-lucide="arrow-right"></i>
+    <div class="pipe"><div class="ic"><i data-lucide="tags"></i></div><b>LabelEncoder</b><span>class id → parameter name</span></div>
+  </div>
+</section>
+
+<section class="grid g-2">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="grid-3x3"></i>Confusion matrix (test set)</h2><p>Rows = true parameter, columns = predicted. Darker = more sentences.</p></div></div>
+    {{ confusion(ev) }}
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="chart-column"></i>Training data: sentences per parameter</h2><p>Dataset.csv after dropna</p></div></div>
+    {{ hbars(ev.distribution) }}
+  </div>
+</section>
+
+<section class="card" style="margin-bottom:20px">
+  <div class="card-h"><div><h2><i data-lucide="table-2"></i>Per-parameter metrics</h2><p>Saved model on the notebook's held-out split (train_test_split, test_size = 0.2, random_state = 42)</p></div></div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Parameter</th><th class="num">Precision</th><th class="num">Recall</th><th>F1-score</th><th class="num">Support</th></tr></thead>
+    <tbody>
+    {% for m in ev.per_class %}
+      <tr><td><span class="chip"><span class="sw" style="background: {{ param_color[m.label] }}"></span>{{ m.label }}</span></td>
+        <td class="num">{{ '%.2f'|format(m.precision) }}</td><td class="num">{{ '%.2f'|format(m.recall) }}</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar-mini" style="flex:1"><span style="width: {{ m.f1 * 100 }}%"></span></div>
+          <span class="num" style="width:34px">{{ '%.2f'|format(m.f1) }}</span></div></td>
+        <td class="num">{{ m.support }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="grid g-2">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="terminal"></i>Classification report (scikit-learn output)</h2></div></div>
+    <pre class="rep">{{ ev.report }}</pre>
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="info"></i>How to read these numbers</h2></div></div>
+    <div class="note" style="margin-bottom:12px"><i data-lucide="flask-conical"></i>
+      <span>The test set holds only {{ ev.n_test }} sentences, so each class is judged on 1–6 examples. Treat per-class figures as indicative, not as a reliable estimate of real-world accuracy.</span></div>
+    <dl class="kv">
+      <dt>Algorithm</dt><dd>TF-IDF features + Linear Support Vector Machine</dd>
+      <dt>Training data</dt><dd>{{ ev.n_rows }} hand-labelled cloud-provider sentences</dd>
+      <dt>Confidence</dt><dd>LinearSVC has no probabilities; reports show the raw decision score</dd>
+      <dt>Limitations</dt><dd>No "other" class; single domain; English text-based PDFs only</dd>
+      <dt>Reproduce</dt><dd><code>python evaluate_model.py</code></dd>
+    </dl>
+  </div>
+</section>
+{% endblock %}

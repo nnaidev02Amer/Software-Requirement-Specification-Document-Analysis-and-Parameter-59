@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hbars, donut %}
+{% block title %}Analytics & Reports{% endblock %}
+{% block heading %}Analytics &amp; Reports{% endblock %}
+{% block subheading %}Aggregated results from every analysed document{% endblock %}
+{% block content %}
+<section class="grid g-4">
+  <div class="card stat"><div class="ic"><i data-lucide="files"></i></div><div><div class="k">Documents</div><div class="v">{{ agg.documents }}</div><div class="s">{{ agg.pages }} pages</div></div></div>
+  <div class="card stat"><div class="ic alt"><i data-lucide="text-quote"></i></div><div><div class="k">Sentences</div><div class="v">{{ agg.sentences }}</div><div class="s">{{ agg.fragments }} fragments excluded</div></div></div>
+  <div class="card stat"><div class="ic alt2"><i data-lucide="list-checks"></i></div><div><div class="k">Requirement sentences</div><div class="v">{{ agg.requirements }}</div>
+    <div class="s">{% if agg.documents %}{{ '%.1f'|format(agg.requirements / agg.documents) }} per document{% else %}–{% endif %}</div></div></div>
+  <div class="card stat"><div class="ic alt3"><i data-lucide="tags"></i></div><div><div class="k">Parameters covered</div><div class="v">{{ agg.params_identified }} / {{ agg.n_labels }}</div><div class="s">at least one sentence</div></div></div>
+</section>
+
+<section class="grid g-2">
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="chart-column"></i>Sentences classified by parameter</h2><p>Total across all documents</p></div></div>
+    {% if agg.requirements %}{{ hbars(agg.label_totals) }}{% else %}<div class="empty"><i data-lucide="chart-column"></i><div>No data yet</div></div>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-h"><div><h2><i data-lucide="chart-pie"></i>Parameter distribution</h2><p>Share of requirement sentences</p></div></div>
+    {{ donut(agg) }}
+  </div>
+</section>
+
+<section class="card" style="margin-bottom:20px">
+  <div class="card-h"><div><h2><i data-lucide="grid-3x3"></i>Parameter coverage by document</h2><p>Requirement sentences per parameter; darker = more sentences</p></div>
+    <a class="btn sm primary" href="{{ url_for('summary_csv') }}"><i data-lucide="download"></i>Export summary CSV</a></div>
+  {% if docs %}
+  {% set ramp = ['#ffffff', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95'] %}
+  {% set ns = namespace(mx=1) %}{% for d in docs %}{% for v in d.label_counts.values() %}{% if v > ns.mx %}{% set ns.mx = v %}{% endif %}{% endfor %}{% endfor %}
+  <div class="table-wrap">
+  <table class="table heat">
+    <thead><tr><th>Document</th>{% for l in model_info.labels %}<th class="num" title="{{ l }}"><span class="sw" style="background: {{ param_color[l] }}"></span> {{ l.split()[0] }}</th>{% endfor %}<th class="num">Total</th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+    <tr><td><a href="{{ url_for('report', rid=d.id) }}">{{ d.file_name }}</a><br><small class="faint">{{ d.created }}</small></td>
+      {% for l in model_info.labels %}{% set v = d.label_counts.get(l, 0) %}{% set step = ((v / ns.mx) * 6)|round|int %}
+      <td class="h {{ 'z' if not v }}" style="background: {{ ramp[step] }}; color: {{ '#fff' if step >= 4 else '#0f172a' }}" data-tip="{{ d.file_name }} · {{ l }}: {{ v }}">{{ v }}</td>{% endfor %}
+      <td class="num"><b>{{ d.requirement_sentences }}</b></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<div class="empty"><i data-lucide="grid-3x3"></i><div>No documents analysed yet</div></div>{% endif %}
+</section>
+
+<section class="card">
+  <div class="card-h"><div><h2><i data-lucide="download"></i>Downloadable reports</h2><p>Per-document exports of every sentence and prediction</p></div></div>
+  <ul class="activity">
+    {% for d in docs %}
+    <li style="align-items:center"><span class="ai"><i data-lucide="file-text"></i></span>
+      <div style="flex:1;min-width:0"><b>{{ d.file_name }}</b><small>{{ d.created }} · {{ d.total_sentences }} sentences</small></div>
+      <div class="actions">
+        <a class="btn sm" href="{{ url_for('report_csv', rid=d.id) }}"><i data-lucide="file-spreadsheet"></i>CSV</a>
+        <a class="btn sm" href="{{ url_for('report_json', rid=d.id) }}"><i data-lucide="file-json"></i>JSON</a>
+        <a class="btn sm" href="{{ url_for('report', rid=d.id) }}"><i data-lucide="printer"></i>Printable</a></div></li>
+    {% else %}<li class="empty">No reports yet</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Identified Parameters{% endblock %}
+{% block heading %}Identified Parameters{% endblock %}
+{% block subheading %}{% if selected %}{{ selected.file_name }}{% else %}All analysed documents{% endif %}{% endblock %}
+{% block content %}
+<section class="card" style="margin-bottom:20px">
+  <div class="card-h" style="margin-bottom:0">
+    <div><h2><i data-lucide="tags"></i>{{ agg.params_identified }} of {{ agg.n_labels }} parameters identified</h2>
+      <p>{{ agg.requirements }} requirement sentences in {{ agg.documents }} document{{ '' if agg.documents == 1 else 's' }}</p></div>
+    <form class="filters" method="get">
+      <select class="select" name="doc" onchange="this.form.submit()" aria-label="Document scope">
+        <option value="">All documents</option>
+        {% for d in docs %}<option value="{{ d.id }}" {{ 'selected' if selected and selected.id == d.id }}>{{ d.file_name }} · {{ d.created }}</option>{% endfor %}
+      </select>
+      <noscript><button class="btn sm">Apply</button></noscript>
+    </form>
+  </div>
+</section>
+
+<section class="grid g-4">
+  {% for label, c in agg.label_totals.items() %}
+  <a href="#p-{{ loop.index }}" class="param-card {{ 'zero' if not c }}" style="color:inherit">
+    <div class="top">
+      <span class="pi" style="background: {{ param_color[label] }}"><i data-lucide="{{ param_icon[label] }}"></i></span>
+      <div style="min-width:0"><h3>{{ label }}</h3>
+        <div class="meta">{% if selected %}{{ 'found' if c else 'not found' }}{% else %}in {{ agg.docs_with[label] }} of {{ agg.documents }} docs{% endif %}</div></div>
+      <span class="count">{{ c }}</span>
+    </div>
+    {% set share = (c / agg.requirements * 100) if agg.requirements else 0 %}
+    <div class="bar-mini" style="margin-top:12px" data-tip="{{ label }}: {{ '%.1f'|format(share) }}% of requirement sentences"><span style="width: {{ share }}%"></span></div>
+  </a>
+  {% endfor %}
+</section>
+
+<section class="card">
+  <div class="card-h"><div><h2><i data-lucide="list-tree"></i>Sentences by parameter</h2><p>Sorted by SVM decision score (most clear-cut first). The score is a margin, not a probability.</p></div></div>
+  {% for label, items in sentences.items() %}
+  <details class="param" id="p-{{ loop.index }}" {% if loop.first and items %}open{% endif %}>
+    <summary><span class="sw" style="background: {{ param_color[label] }}"></span>{{ label }}
+      <span class="chip" style="padding:1px 8px">{{ items|length }}</span><i data-lucide="chevron-down" class="chev"></i></summary>
+    {% if items %}
+    <ul class="sent-list">
+      {% for p in items %}
+      <li><span>{{ p.sentence.split()|join(' ') }}{% if not selected %}<br><small><a href="{{ url_for('report', rid=p.doc_id) }}">{{ p.doc }}</a> · sentence #{{ p.index }}</small>{% endif %}</span>
+        <span class="score">{{ '%.3f'|format(p.decision_score) }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<div class="empty small">No sentences classified as {{ label }}.</div>{% endif %}
+  </details>
+  {% endfor %}
+</section>
+<script>document.querySelectorAll('a.param-card').forEach(a => a.addEventListener('click', () => {
+  const d = document.querySelector(a.getAttribute('href')); if (d) d.open = true; }));</script>
+{% endblock %}
